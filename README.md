@@ -17,7 +17,7 @@ OR you can
 
 go to [Repo](https://github.com/James-Riordan/dme-website) and click on `Code` -> `Download Zip`
 
-## 2. Install project dependencies
+## 3. Install project dependencies
 
 1. 
     ```sh
@@ -29,7 +29,7 @@ go to [Repo](https://github.com/James-Riordan/dme-website) and click on `Code` -
     bun install
     ```
 
-## 3. Run the code:
+## 4. Run the code:
 
 3.
     ```sh
