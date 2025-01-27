@@ -17,14 +17,14 @@
   
 	// Update itemsPerPage based on screen size
 	const updateItemsPerPage = () => {
-	  if (window.matchMedia('(min-width: 1536px)').matches) {
-		itemsPerPage.set(24);
-	  } else if (window.matchMedia('(min-width: 1280px)').matches) {
+	  if (window.matchMedia('(min-width: 1280px)').matches) {
 		itemsPerPage.set(20);
 	  } else if (window.matchMedia('(min-width: 1024px)').matches) {
 		itemsPerPage.set(16);
 	  } else if (window.matchMedia('(min-width: 768px)').matches) {
 		itemsPerPage.set(12);
+	  } else if (window.matchMedia('(min-width: 640px)').matches) {
+		itemsPerPage.set(8);
 	  } else {
 		itemsPerPage.set(8);
 	  }
