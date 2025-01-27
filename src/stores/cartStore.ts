@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 
 export interface CartItem {
+    id: string;
     title: string;
     description: string;
     imageURL: string;
@@ -12,7 +13,16 @@ export interface CartItem {
   
   // Utility functions to manage the cart
   export const addToCart = (item: CartItem) => {
-    cart.update((currentCart) => [...currentCart, item]);
+    cart.update((currentCart) => {
+      // Check if the item already exists
+      const exists = currentCart.some((i) => i.id === item.id);
+  
+      // If it exists, return the current cart without adding the item
+      if (exists) return currentCart;
+  
+      // Otherwise, add the new item
+      return [...currentCart, item];
+    });
   };
   
   export const removeFromCart = (itemTitle: string) => {
