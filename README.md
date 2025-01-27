@@ -2,9 +2,8 @@
 
 ## 1. Install [bun](https://bun.sh/docs/installation)
 
-if Windows: 
+to install, if Windows, paste into terminal: 
 
-(paste into terminal)
 ```
 powershell -c "irm bun.sh/install.ps1|iex"
 ```
