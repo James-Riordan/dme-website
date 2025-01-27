@@ -2,7 +2,7 @@
 
 ## 1. Install [bun](https://bun.sh/docs/installation)
 
-to install, if Windows, paste into terminal: 
+to install, if on Windows, paste into terminal: 
 
 ```
 powershell -c "irm bun.sh/install.ps1|iex"
@@ -10,12 +10,12 @@ powershell -c "irm bun.sh/install.ps1|iex"
 ## 2. Download / Git Clone repo
 
 ```sh
-git clone 
+git clone https://github.com/James-Riordan/dme-website.git
 ```
 
 OR you can
 
-Click on `code` -> `download zip`
+go to [Repo](https://github.com/James-Riordan/dme-website) and click on `Code` -> `Download Zip`
 
 ## 2. Install project dependencies
 
