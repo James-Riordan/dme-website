@@ -1,0 +1,21 @@
+# Development Environment: Bun + SvelteKit + Hot Reload
+FROM oven/bun:latest AS dev
+
+WORKDIR /app
+
+# Install dependencies (do not copy everything yet to optimize caching)
+COPY bun.lockb package.json ./
+RUN bun install --frozen-lockfile
+
+# Copy the full project for hot-reloading
+COPY . .
+
+# Expose port (adjust to match your SvelteKit dev port)
+EXPOSE 5173
+
+# Environment variables for development
+ENV NODE_ENV=development
+ENV PORT=5173
+
+# Start development server with hot reload
+CMD ["bun", "run", "dev"]
