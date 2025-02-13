@@ -7,18 +7,18 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgres://user:mysecretpassword@db:5432/local
+      - POSTGRES_URL=postgres://user:mysecretpassword@db:5432/local
       - VALKEY_URL=redis://valkey:6379
       - MAIL_SERVER=smtp://mailhog:1025
     volumes:
       - .:/app
       - /app/node_modules
     depends_on:
-      - db
+      - postgres
       - valkey
-      - mailhog
-      - elasticsearch
-  db:
+      # - mailhog
+      # - elasticsearch
+  postgres:
     image: postgres:17.2
     restart: always
     ports:
@@ -33,29 +33,29 @@ services:
     ports:
       - "6379:6379"
 
-  mailhog:
-    image: mailhog/mailhog:latest
-    restart: always
-    ports:
-      - "1025:1025"
-      - "8025:8025" # Web UI for testing emails
+  # mailhog:
+  #   image: mailhog/mailhog:latest
+  #   restart: always
+  #   ports:
+  #     - "1025:1025"
+  #     - "8025:8025" # Web UI for testing emails
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+  #   environment:
+  #     - discovery.type=single-node
+  #     - xpack.security.enabled=false
+  #   ports:
+  #     - "9200:9200"
   # lago:
   #   image: getlago/lago:latest
   #   restart: always
   #   environment:
-  #     - DATABASE_URL=postgres://user:password@db:5432/lago
+  #     - POSTGRES_URL=postgres://user:password@db:5432/lago
   #     - STRIPE_SECRET_KEY=sk_test_XXX
   #   ports:
   #     - "3001:3001"
   #   depends_on:
-  #     - db
+  #     - postgres
 volumes:
   postgres_data:

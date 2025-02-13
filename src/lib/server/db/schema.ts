@@ -1,20 +1,19 @@
-import { pgTable, serial, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, integer, timestamp, unique } from 'drizzle-orm/pg-core';
 
-export const user = pgTable('user', {
+export const users = pgTable('user', {
 	id: text('id').primaryKey(),
-	age: integer('age'),
-	username: text('username').notNull().unique(),
-	passwordHash: text('password_hash').notNull()
+	email: text('email').unique().notNull(),
+	passwordHash: text('password_hash'),
+	googleId: text('google_id').unique(),
+	isAdmin: boolean('is_admin').default(false),
+	createdAt: timestamp('created_at').defaultNow(),
+	updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-export const session = pgTable('session', {
+export const sessions = pgTable('session', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
-		.references(() => user.id),
-	expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull()
+		.references(() => users.id),
+	expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
-
-export type Session = typeof session.$inferSelect;
-
-export type User = typeof user.$inferSelect;
