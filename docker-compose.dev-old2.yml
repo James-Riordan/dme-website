@@ -1,25 +1,26 @@
-version: "3.8"
-
 services:
   ### 🟢 DME-WEBSITE (SvelteKit App) ###
   dme-website:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: dme-website
     restart: always
     depends_on:
       - dme-billing-service
     environment:
       - PUBLIC_BILLING_API_URL=http://dme-billing-service:3001
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-lago_user}:${POSTGRES_PASSWORD:-lago_password}@postgres:5432/lago
+      - VALKEY_URL=valkey  # Must match the container name of Valkey
+      - VALKEY_PORT=6379    # Default Redis port
     ports:
-      - "5173:5173"  # Change this if needed
+      - "5173:5173"
 
   ### 🟠 DME-BILLING-SERVICE (Node.js API for billing) ###
   dme-billing-service:
     build:
       context: ../dme-billing-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: dme-billing-service
     restart: always
     depends_on:
@@ -27,9 +28,9 @@ services:
       - postgres
     environment:
       - PORT=3001
-      - LAGO_API_KEY=your-lago-api-key
-      - LAGO_API_URL=http://lago:3000
-      - DATABASE_URL=postgresql://lago_user:lago_password@postgres:5432/lago
+      - LAGO_API_KEY=${LAGO_API_KEY:-your-lago-api-key}
+      - LAGO_API_URL=${LAGO_API_URL:-http://lago:3000}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-lago_user}:${POSTGRES_PASSWORD:-lago_password}@postgres:5432/lago
     ports:
       - "3001:3001"
 
@@ -40,12 +41,13 @@ services:
     restart: always
     depends_on:
       - postgres
-      - redis
+      - valkey
     environment:
-      - DATABASE_URL=postgresql://lago_user:lago_password@postgres:5432/lago
-      - REDIS_URL=redis://redis:6379
-      - SECRET_KEY_BASE=your-secret-key-base-hex-64
-      - RAILS_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-lago_user}:${POSTGRES_PASSWORD:-lago_password}@postgres:5432/lago
+      - VALKEY_URL=valkey  # Must match the container name of Valkey
+      - VALKEY_PORT=6379    # Default Redis port
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-your-secret-key-base-hex-64}
+      - RAILS_ENV=development
     ports:
       - "3000:3000" # Lago API exposed
 
@@ -55,15 +57,15 @@ services:
     container_name: lago-db
     restart: always
     environment:
-      POSTGRES_USER: lago_user
-      POSTGRES_PASSWORD: lago_password
+      POSTGRES_USER: ${POSTGRES_USER:-lago_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lago_password}
       POSTGRES_DB: lago
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
-  ### 🔴 Valkey (Redis Alternative) ###
+  ### 🔴 Valkey (valkey Alternative) ###
   valkey:
     image: valkey/valkey:latest
     container_name: valkey

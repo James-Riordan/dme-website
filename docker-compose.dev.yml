@@ -1,0 +1,321 @@
+name: lago_dev
+
+volumes:
+  front_node_modules_dev:
+  front_dist_dev:
+  postgres_data_dev:
+  redis_data_dev:
+  redpanda_data_dev:
+  clickhouse_data_dev:
+
+
+services:
+  ### 🟢 DME-WEBSITE (SvelteKit Frontend) ###
+  dme-website:
+    build:
+      context: C:/Workspaces/DME/Code/dme-website
+      dockerfile: Dockerfile.dev
+    container_name: dme-website
+    restart: always
+    depends_on:
+      - dme-billing-service
+      - api
+      - redis
+    environment:
+      - PUBLIC_BILLING_API_URL=http://api:3000
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-lago_user}:${POSTGRES_PASSWORD:-lago_password}@db:5432/lago
+      - VALKEY_URL=redis # Updated to match service name
+      - VALKEY_PORT=6379
+    ports:
+      - "5173:5173"
+
+  ### 🟠 DME-BILLING-SERVICE (Node.js API for Billing) ###
+  dme-billing-service:
+    build:
+      context: C:/Workspaces/DME/Code/dme-billing-service
+      dockerfile: Dockerfile.dev
+    container_name: dme-billing-service
+    restart: always
+    depends_on:
+      - api
+      - db
+      - redis
+    environment:
+      - PORT=3001
+      - LAGO_API_KEY=${LAGO_API_KEY:-your-lago-api-key}
+      - LAGO_API_URL=http://api:3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-lago_user}:${POSTGRES_PASSWORD:-lago_password}@db:5432/lago
+    ports:
+      - "3001:3001"
+
+  ### 🔵 Traefik for Reverse Proxy ###
+  traefik:
+    image: "traefik:v2.5.4"
+    container_name: lago_traefik_dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml
+      - ./traefik/certs:/etc/certs
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.lago.dev`)"
+      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+  ### 🟡 PostgreSQL for Lago ###
+  db:
+    image: postgres:14.0-alpine
+    container_name: lago_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lago}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      PGDATA: /data/postgres
+      POSTGRES_MULTIPLE_DATABASES: lago,lago_test
+    volumes:
+      - ./pg-init-scripts:/docker-entrypoint-initdb.d
+      - postgres_data_dev:/data/postgres
+    ports:
+      - "5432:5432"
+
+  ### 🔴 Valkey (Redis Alternative) ###
+  redis:
+    image: valkey/valkey:latest
+    container_name: lago_redis_dev
+    restart: unless-stopped
+    volumes:
+      - redis_data_dev:/data
+    ports:
+      - "6379:6379"
+
+  ### 🔵 Lago Frontend ###
+  front:
+    image: front_dev
+    container_name: lago_front_dev
+    stdin_open: true
+    restart: unless-stopped
+    depends_on:
+      - api
+    build:
+      context: C:/Workspaces/DME/Code/lago/front
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../lago/front:/app:delegated
+      - front_node_modules_dev:/app/node_modules:delegated
+      - front_dist_dev:/app/dist:delegated
+    environment:
+      - NODE_ENV=development
+      - API_URL=https://api.lago.dev
+      - APP_DOMAIN=https://app.lago.dev
+      - CODEGEN_API=http://api:3000/graphql
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`app.lago.dev`)"
+      - "traefik.http.routers.app.entrypoints=web,ws,websecure"
+      - "traefik.http.routers.app.tls=true"
+      - "traefik.http.services.app.loadbalancer.server.port=8080"
+ 
+  ### 🟠 Lago API Service ###
+  api:
+    image: api_dev
+    container_name: lago_api_dev
+    restart: unless-stopped
+    command: [ "./scripts/start.dev.sh" ]
+    depends_on:
+      - db
+      - redis
+    build:
+      context: C:/Workspaces/DME/Code/lago/api # <--- Absolute path
+      dockerfile: Dockerfile.dev
+    volumes:
+      - C:/Workspaces/DME/Code/lago/api:/app:delegated # <--- Absolute path
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-lago}:${POSTGRES_PASSWORD:-changeme}@db:5432/lago
+      - VALKEY_URL=redis
+      - VALKEY_PORT=6379
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-your-secret-key-base-hex-64}
+      - RAILS_ENV=development
+      - LAGO_RSA_PRIVATE_KEY=${LAGO_RSA_PRIVATE_KEY}
+    env_file:
+      - .env.development
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api_http.rule=Host(`api.lago.dev`)"
+      - "traefik.http.routers.api_http.entrypoints=web"
+      - "traefik.http.routers.api_http.service=api_http"
+      - "traefik.http.services.api_http.loadbalancer.server.port=3000"
+      - "traefik.http.routers.api.rule=Host(`api.lago.dev`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.service=api"
+      - "traefik.http.routers.api.tls=true"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+
+  ### 📨 MailHog (For Email Testing) ###
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+  api-worker: &api_worker
+    image: api_dev
+    container_name: lago_api_worker
+    restart: unless-stopped
+    command: bash -c "bundle install && ./scripts/start.worker.sh"
+    depends_on:
+      - api
+    build:
+      context: C:/Workspaces/DME/Code/lago/api
+      dockerfile: Dockerfile.dev
+    volumes:
+      - C:/Workspaces/DME/Code/lago/api:/app:delegated
+    env_file:
+      - path: ./.env.development
+        required: false
+
+  api-events-worker:
+    <<: *api_worker
+    container_name: lago_api_events_worker_dev
+    command: bash -c "bundle install && ./scripts/start.events.worker.sh"
+
+  api-pdfs-worker:
+    <<: *api_worker
+    container_name: lago_api_pdfs_worker_dev
+    command: bash -c "bundle install && ./scripts/start.pdfs.worker.sh"
+
+  api-billing-worker:
+    <<: *api_worker
+    container_name: lago_api_billing_worker_dev
+    command: bash -c "bundle install && ./scripts/start.billing.worker.sh"
+
+  api-clock-worker:
+    <<: *api_worker
+    container_name: lago_api_clock_worker_dev
+    command: bash -c "bundle install && ./scripts/start.clock.worker.sh"
+
+  api-webhook-worker:
+    <<: *api_worker
+    container_name: lago_api_webhook_worker_dev
+    command: bash -c "bundle install && ./scripts/start.webhook.worker.sh"
+
+  api-clock:
+    image: api_dev
+    container_name: lago_api_clock_dev
+    restart: unless-stopped
+    command: bash -c "bundle install && ./scripts/start.clock.sh"
+    depends_on:
+      - api
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    volumes:
+      - C:/Workspaces/DME/Code/lago/api:/app:delegated
+    env_file:
+      - path: ./.env.development
+        required: false
+
+  pdf:
+    image: getlago/lago-gotenberg:7
+    container_name: lago_pdf_dev
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--log-level=debug"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pdf.rule=Host(`pdf.lago.dev`)"
+      - "traefik.http.routers.pdf.entrypoints=web,websecure"
+      - "traefik.http.routers.pdf.tls=true"
+      - "traefik.http.services.pdf.loadbalancer.server.port=3000"
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.9
+    container_name: lago_redpanda_dev
+    restart: unless-stopped
+    hostname: redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    volumes:
+      - redpanda_data_dev:/var/lib/redpanda/data
+    ports:
+      - 9092:9092
+      - 19092:19092
+
+  redpandacreatetopics:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.9
+    depends_on:
+      - redpanda
+    entrypoint: >
+      rpk topic create events-raw --brokers redpanda:9092
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.3.1
+    container_name: lago_redpanda_console_dev
+    entrypoint: /bin/sh
+    command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["redpanda:9092"]
+          schemaRegistry:
+            enabled: false
+            urls: ["http://redpanda:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda:9644"]
+    depends_on:
+      - redpanda
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.console.rule=Host(`console.lago.dev`)"
+      - "traefik.http.routers.console.entrypoints=websecure"
+      - "traefik.http.routers.console.tls=true"
+      - "traefik.http.services.console.loadbalancer.server.port=8080"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: lago_clickhouse_dev
+    restart: unless-stopped
+    hostname: clickhouse
+    user: "101:101"
+    depends_on:
+      - db
+      - redpanda
+      - redpandacreatetopics
+    volumes:
+      - clickhouse_data_dev:/var/lib/clickhouse
+      - ./extra/clickhouse/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./extra/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+      - 9000:9000
+      - 8123:8123
+
+  ### 🔵 Lago Migrations ###
+  migrate:
+    container_name: lago-migrate_dev
+    image: api_dev
+    depends_on:
+      - db
+    command: [ "./scripts/migrate.dev.sh" ]
+    build:
+      context: C:/Workspaces/DME/Code/lago/api # <--- Absolute path
+      dockerfile: Dockerfile.dev
+    volumes:
+      - C:/Workspaces/DME/Code/lago/api:/app:delegated # <--- Absolute path
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-lago}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-lago}

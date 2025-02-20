@@ -1,0 +1,61 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - POSTGRES_URL=postgres://user:mysecretpassword@db:5432/local
+      - VALKEY_URL=redis://valkey:6379
+      - MAIL_SERVER=smtp://mailhog:1025
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - valkey
+      # - mailhog
+      # - elasticsearch
+  postgres:
+    image: postgres:17.2
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: local
+  valkey:
+    image: valkey/valkey:latest
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # mailhog:
+  #   image: mailhog/mailhog:latest
+  #   restart: always
+  #   ports:
+  #     - "1025:1025"
+  #     - "8025:8025" # Web UI for testing emails
+
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+  #   environment:
+  #     - discovery.type=single-node
+  #     - xpack.security.enabled=false
+  #   ports:
+  #     - "9200:9200"
+  # lago:
+  #   image: getlago/lago:latest
+  #   restart: always
+  #   environment:
+  #     - POSTGRES_URL=postgres://user:password@db:5432/lago
+  #     - STRIPE_SECRET_KEY=sk_test_XXX
+  #   ports:
+  #     - "3001:3001"
+  #   depends_on:
+  #     - postgres
+volumes:
+  postgres_data:
